@@ -2,7 +2,7 @@ using MessageBroker.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-//dotnet tool update --global dotnet-ef
+//dotnet tool update --global dotnet-ef dotnet tool install --global dotnet-ef
 // Add services to the container.
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
