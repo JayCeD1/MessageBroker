@@ -81,6 +81,86 @@ app.MapPost("api/topics/{id:int}/messages", async (AppDbContext context, int id,
     return Results.Ok("Message has been published");
 });
 
+//Create Subscription
+app.MapPost("api/topics/{id:int}/subscriptions", async (AppDbContext context, int id, Subscription sub) =>
+{
+    bool topics = await context.Topics.AnyAsync(topic => topic.Id == id);
+
+    if (!topics)
+    {
+        return Results.NotFound("Topics not found");
+    }
+
+    sub.TopicId = id;
+
+    await context.Subscriptions.AddAsync(sub);
+
+    await context.SaveChangesAsync();
+
+    return Results.Created($"api/topics/{id}/subscriptions/{sub.Id}", sub);
+});
+
+//Get Subscriber Messages
+app.MapGet("api/subscriptions/{id:int}/messages", async (AppDbContext context, int id) =>
+{
+    var subbed = await context.Subscriptions.AnyAsync(sub => sub.Id == id);
+
+    if (!subbed)
+    {
+        return Results.NotFound("Not found");
+    }
+
+    var messages = context.Messages.Where(msg => msg.SubscriptionId == id && msg.MessageStatus != "SENT");
+
+    if (!messages.Any())
+    {
+        return Results.NotFound("No new messages");
+    }
+
+    foreach (var msg in messages)
+    {
+        msg.MessageStatus = "REQUESTED";
+    }
+
+    await context.SaveChangesAsync();
+
+    return Results.Ok(messages);
+});
+
+//Ack Messages for Subscriber
+app.MapPost("api/subscriptions/{id:int}/messages", async (AppDbContext context, int id, int[] confs) =>
+{
+    var subbed = await context.Subscriptions.AnyAsync(sub => sub.Id == id);
+
+    if (!subbed)
+    {
+        return Results.NotFound("subscription not found");
+    }
+
+    if (confs.Length <= 0)
+    {
+        return Results.BadRequest();
+    }
+
+    int count = 0;
+
+    foreach (int index in confs)
+    {
+        var msg = await context.Messages.FirstOrDefaultAsync(m => m.Id == index);
+
+        if (msg != null)
+        {
+            msg.MessageStatus = "SENT";
+
+            await context.SaveChangesAsync();
+            count++;
+        }
+    }
+
+    return Results.Ok($"Acknowledged {count}/{confs.Length} messages");
+
+});
+
 app.UseAuthorization();
 
 app.MapControllers();
